@@ -16,12 +16,23 @@ hero:
 
 <script setup>
 import projectsData from './.vitepress/projects.json'
+import { onMounted } from 'vue'
 
 function goToProject(url) {
   // 强制浏览器原生导航，绕过 VitePress 的 SPA 路由拦截
   // （同源绝对 URL 也会被 Vue Router 拦截去查 hashmap.json，导致 SPA 404）
   window.location.href = url
 }
+
+onMounted(() => {
+  // 从 dataview 点返回按钮时，Chrome bfcache 会恢复索引页状态（不重新执行 JS），
+  // 导致 URL 已变但页面没刷新。检测到 bfcache 恢复时强制 reload。
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      window.location.reload()
+    }
+  })
+})
 </script>
 
 <div class="projects-intro">
