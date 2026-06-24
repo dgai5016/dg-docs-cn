@@ -1,0 +1,105 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: site-index/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install MkDocs Material
+        run: pip install mkdocs-material
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build site-index
+        working-directory: site-index
+        run: |
+          npm install
+          npm run build
+
+      - name: Prepare dist root
+        run: |
+          mkdir -p _site
+          cp -r site-index/.vitepress/dist/* _site/
+
+      - name: Discover and build projects
+        env:
+          REPO_ROOT: ${{ github.workspace }}
+        run: |
+          set -e
+          for dir in "$REPO_ROOT"/*/; do
+            proj_name=$(basename "$dir")
+            # 跳过系统目录
+            case "$proj_name" in
+              site-index|.github|.claude|node_modules) continue ;;
+            esac
+
+            if [ ! -f "$dir.project.json" ]; then
+              echo "[skip] $proj_name: no .project.json"
+              continue
+            fi
+
+            framework=$(node -e "console.log(require('$dir.project.json').framework || 'unknown')")
+            echo "[build] $proj_name (framework=$framework)"
+
+            case "$framework" in
+              mkdocs)
+                (cd "$dir" && mkdocs build --strict)
+                mkdir -p "_site/$proj_name"
+                cp -r "$dir/site/"* "_site/$proj_name/"
+                ;;
+              vitepress)
+                (cd "$dir" && [ -f package.json ] && npm install || true)
+                (cd "$dir" && npm run docs:build)
+                mkdir -p "_site/$proj_name"
+                cp -r "$dir/.vitepress/dist/"* "_site/$proj_name/"
+                ;;
+              *)
+                echo "[warn] $proj_name: unsupported framework '$framework', skipping"
+                ;;
+            esac
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

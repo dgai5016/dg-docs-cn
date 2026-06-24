@@ -1,0 +1,68 @@
+site_name: Dataview
+repo_url: https://github.com/blacksmithgu/obsidian-dataview
+edit_uri: edit/master/docs/docs/
+markdown_extensions:
+  - abbr
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.tasklist
+theme:
+  name: material
+  palette:
+    primary: deep purple
+  logo: assets/obsidian.png
+  favicon: assets/obsidian.png
+  custom_dir: overrides
+nav:
+  - 概览: 'index.md'
+  - 元数据:
+    - 添加元数据: 'annotation/add-metadata.md'
+    - 数据类型: 'annotation/types-of-metadata.md'
+    - 页面元数据: 'annotation/metadata-pages.md'
+    - 任务和列表的元数据: 'annotation/metadata-tasks.md'
+  - DQL、JS 与内联查询: 'queries/dql-js-inline.md'
+  - 查询语言参考:
+    - 查询结构: 'queries/structure.md'
+    - 查询类型: 'queries/query-types.md'
+    - 数据命令: 'queries/data-commands.md'
+    - 与 SQL 的差异: 'queries/differences-to-sql.md'
+    - 数据源: 'reference/sources.md'
+    - 表达式: 'reference/expressions.md'
+    - 字面量: 'reference/literals.md'
+    - 函数: 'reference/functions.md'
+  - JavaScript 参考:
+    - 概览: 'api/intro.md'
+    - Data Array: 'api/data-array.md'
+    - 代码块参考: 'api/code-reference.md'
+    - 代码块示例: 'api/code-examples.md'
+  - 常见问题与资源:
+    - 常见问题: 'resources/faq.md'
+    - 示例: 'resources/examples.md'
+    - 基于 Dataview 开发: 'resources/develop-against-dataview.md'
+    - 资源与支持: 'resources/resources-and-support.md'
+  - Dataview 友邻: 'friends.md'
+  - 更新日志: 'changelog.md'
+plugins:
+  - search
+  - redirects:
+      redirect_maps:
+        docs/where-data-comes-from.md: annotation/add-metadata.md
+        docs/creating-queries.md: queries/dql-js-inline.md
+        docs/query/queries.md: queries/structure.md
+        docs/query/expressions.md: reference/expressions.md
+        docs/query/sources.md: reference/sources.md
+        docs/query/functions.md: reference/functions.md
+        docs/query/examples.md: resources/examples.md
+        docs/api/intro.md: api/intro.md
+        docs/api/data-array.md: api/data-array.md
+        docs/api/code-reference.md: api/code-reference.md
+        docs/api/code-examples.md: api/code-examples.md
+        data-queries.md: queries/dql-js-inline.md
+        query/queries.md: queries/structure.md
+        data-annotation.md: annotation/add-metadata.md
+        resources-and-support.md: resources/resources-and-support.md
+        plugin/develop-against-dataview.md: resources/develop-against-dataview.md
+        reference/faq.md: resources/faq.md
+        reference/examples.md: resources/examples.md

@@ -1,0 +1,10 @@
+{
+  "repo": "https://github.com/blacksmithgu/obsidian-dataview",
+  "branch": "master",
+  "commit": "5ad0994ff384cbb797de382e7edff2388141b73a",
+  "commit_short": "5ad0994",
+  "commit_date": "2025-04-08",
+  "commit_message": "Updated beta-release script with pre-release tags",
+  "captured_at": "2026-06-24T18:30:00Z",
+  "note": "回填版本信息：dataview 在加版本追踪能力之前翻译完成，此文件记录当时基于的原文 commit"
+}
