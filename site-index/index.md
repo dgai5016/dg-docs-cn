@@ -16,6 +16,12 @@ hero:
 
 <script setup>
 import projectsData from './.vitepress/projects.json'
+
+function goToProject(url) {
+  // 强制浏览器原生导航，绕过 VitePress 的 SPA 路由拦截
+  // （同源绝对 URL 也会被 Vue Router 拦截去查 hashmap.json，导致 SPA 404）
+  window.location.href = url
+}
 </script>
 
 <div class="projects-intro">
@@ -29,6 +35,7 @@ import projectsData from './.vitepress/projects.json'
     v-for="p in projectsData"
     :key="p.name"
     :href="p.url"
+    @click.prevent="goToProject(p.url)"
     class="project-card"
   >
     <div class="project-card-header">
