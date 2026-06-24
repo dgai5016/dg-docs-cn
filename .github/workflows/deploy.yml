@@ -33,8 +33,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install MkDocs Material
-        run: pip install mkdocs-material
+      - name: Install MkDocs Material and common plugins
+        run: pip install mkdocs-material mkdocs-redirects mkdocs-section-index mkdocs-monorepo
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
