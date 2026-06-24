@@ -71,7 +71,8 @@ async function main() {
         originalCommitDate: data.original_commit_date || '',
         lastUpdatedAt: data.last_updated_at || '',
         updateCount: data.update_count ?? 0,
-        url: `/dg-docs-cn/${dir.name}/`
+        // 用绝对 URL（带协议），避免被 VitePress 当成站内路由处理（SPA 客户端 404）
+        url: `https://dgai5016.github.io/dg-docs-cn/${dir.name}/`
       })
     } catch (err) {
       console.warn(`[build-projects] 跳过 ${dir.name}/.project.json：${err.message}`)
