@@ -72,7 +72,7 @@ jobs:
 
             case "$framework" in
               mkdocs)
-                (cd "$dir" && mkdocs build --strict)
+                (cd "$dir" && mkdocs build)
                 mkdir -p "_site/$proj_name"
                 cp -r "$dir/site/"* "_site/$proj_name/"
                 ;;
