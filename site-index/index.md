@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: 中文技术文档合集
-  text: 个人维护的英文技术文档中文翻译
-  tagline: 沿用原项目框架，保留原 UI；统一索引，便于学习
+  text: 英文技术文档中文翻译
+  tagline: 保留源站 UI，本站直达译站
   actions:
     - theme: brand
       text: 浏览项目

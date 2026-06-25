@@ -36,6 +36,24 @@ jobs:
       - name: Install MkDocs Material and common plugins
         run: pip install mkdocs-material mkdocs-redirects mkdocs-section-index
 
+      - name: Check if mdBook needed
+        id: check_mdbook
+        run: |
+          if find . -name .project.json -exec grep -l '"framework"[[:space:]]*:[[:space:]]*"mdbook"' {} \; 2>/dev/null | grep -q .; then
+            echo "needs_mdbook=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_mdbook=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install mdBook and plugins
+        if: steps.check_mdbook.outputs.needs_mdbook == 'true'
+        run: |
+          # pin 到 0.4.x 系列：mdbook 0.5 重构了 preprocessor IPC 协议，
+          # mdbook-toc/mdbook-tera 等生态包暂未适配。0.4.52 是 0.4 系列最新。
+          cargo install mdbook --version 0.4.52 --locked
+          cargo install mdbook-toc --version 0.14.2 --locked
+          cargo install mdbook-tera --version 0.6.0 --locked
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
@@ -81,6 +99,18 @@ jobs:
                 (cd "$dir" && npm run docs:build)
                 mkdir -p "_site/$proj_name"
                 cp -r "$dir/.vitepress/dist/"* "_site/$proj_name/"
+                ;;
+              mdbook)
+                # 找 book.toml 所在目录（通常在 $dir/ 或 $dir/docs/）
+                book_toml=$(find "$dir" -maxdepth 3 -name book.toml | head -1)
+                if [ -z "$book_toml" ]; then
+                  echo "[error] $proj_name: framework=mdbook but no book.toml found"
+                  continue
+                fi
+                book_dir=$(dirname "$book_toml")
+                (cd "$book_dir" && mdbook build)
+                mkdir -p "_site/$proj_name"
+                cp -r "$book_dir/book/"* "_site/$proj_name/"
                 ;;
               *)
                 echo "[warn] $proj_name: unsupported framework '$framework', skipping"

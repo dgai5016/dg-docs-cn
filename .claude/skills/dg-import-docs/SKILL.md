@@ -48,11 +48,11 @@ REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 
 | 检查项 | 含义 |
 |--------|------|
-| 含 `mkdocs.yml` 或 `.vitepress/config.{ts,js}` | 是有效的翻译产物 |
+| 含 `mkdocs.yml` / `.vitepress/config.{ts,js}` / `book.toml` | 是有效的翻译产物 |
 | 含 `.source-version.json` | dg-translate-tech-docs 1.1+ 产物，含原文 commit 等版本信息 |
 | 含 `.changed-files.json` | 增量翻译产物，列出本次变更的文件清单 |
 
-**如果都不是有效框架** → 报错退出：「源目录不是有效的翻译产物，缺少 mkdocs.yml 或 .vitepress/config.{ts,js}」
+**如果都不是有效框架** → 报错退出：「源目录不是有效的翻译产物，缺少 mkdocs.yml / .vitepress/config.{ts,js} / book.toml」
 
 **如果缺少 `.source-version.json`** → 警告：「未检测到版本信息，.project.json 的版本字段将为空。建议用 dg-translate-tech-docs 1.1+ 重新生成。」继续执行（版本字段留空）。
 
@@ -156,6 +156,27 @@ base: '/dg-docs-cn/{项目目录名}/'
 
 **更新模式下**：base 已在首次搬运时配置好，无需改。
 
+#### mdBook
+
+mdBook 默认用相对路径构建，**通常无需改 `book.toml`**。
+
+**新建模式可选优化**（让 GitHub Pages 子路径更稳）：
+
+```toml
+# 编辑 $TARGET_DIR/book.toml（或 $TARGET_DIR/docs/book.toml，看 detect 结果）
+[output.html]
+site-url = "/dg-docs-cn/{项目目录名}/"
+```
+
+**更新模式下**：site-url 已在首次搬运时配置好，无需改。
+
+**注意**：mdBook 默认 `[book] language = "en"`。搬运到中文站后，建议改为 `language = "zh-cn"`（影响 HTML lang 属性、mdbook-toc 等本地化行为）：
+
+```toml
+[book]
+language = "zh-cn"
+```
+
 ### Step 6: Create or Update .project.json
 
 #### 新建模式：创建
@@ -234,6 +255,9 @@ mkdocs serve    # http://127.0.0.1:8000
 
 # VitePress:
 npm install && npm run docs:dev    # http://127.0.0.1:5173
+
+# mdBook（在 book.toml 所在目录，可能是 $TARGET_DIR/ 或 $TARGET_DIR/docs/）:
+mdbook serve    # http://127.0.0.1:3000
 ```
 
 **验证索引页能看到项目：**

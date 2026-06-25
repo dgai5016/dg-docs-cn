@@ -1,0 +1,17 @@
+{
+  "name": "templater",
+  "title": "Templater 中文文档",
+  "description": "Obsidian Templater 插件官方文档中文翻译",
+  "original_url": "https://silentvoid13.github.io/Templater/",
+  "original_repo": "https://github.com/SilentVoid13/Templater",
+  "original_branch": "master",
+  "original_commit": "4293151f5581990677b5c0f63b82441bd73be778",
+  "original_commit_short": "4293151",
+  "original_commit_date": "2026-06-22",
+  "framework": "mdbook",
+  "source_docs_path": "docs/",
+  "translated_at": "2026-06-25",
+  "last_updated_at": "2026-06-25",
+  "update_count": 0,
+  "status": "complete"
+}

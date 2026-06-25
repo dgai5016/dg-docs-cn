@@ -1,6 +1,6 @@
 # dg-docs-cn
 
-个人英文技术文档中文翻译合集。把英文技术文档（MkDocs Material / VitePress 构建）翻译为中文版本，集中托管在 GitHub Pages，统一提供导航入口。
+英文技术文档中文翻译合集。把英文技术文档（MkDocs Material / VitePress 构建）翻译为中文版本，集中托管在 GitHub Pages，统一提供导航入口。
 
 ## 目录结构
 

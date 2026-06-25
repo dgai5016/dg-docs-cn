@@ -60,7 +60,7 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `framework` | enum | ✅ | `mkdocs` 或 `vitepress`（其他值会让 CI 跳过构建） |
+| `framework` | enum | ✅ | `mkdocs` / `vitepress` / `mdbook`（其他值会让 CI 跳过构建） |
 | `source_docs_path` | string | ❌ | 原项目文档所在路径（如 `docs/`），仅作记录 |
 | `status` | enum | ✅ | `complete` / `partial` / `draft`，影响卡片角标（✅/🚧） |
 
@@ -68,7 +68,7 @@
 
 - `name` 必须与项目目录名一致
 - `name` 仅允许小写字母、数字、连字符（kebab-case）
-- `framework` 必须是 `mkdocs` 或 `vitepress`
+- `framework` 必须是 `mkdocs` / `vitepress` / `mdbook`
 - `translated_at` / `last_updated_at` / `original_commit_date` 必须是有效的 YYYY-MM-DD
 - `original_commit` 必须是 40 字符的 hex string（如不空）
 - `update_count` 必须 ≥ 0
@@ -81,6 +81,7 @@
 2. 读取 `framework` 字段决定构建方式：
    - `mkdocs`: `mkdocs build` → 复制 `site/` 到 `_site/{目录名}/`
    - `vitepress`: `npm run docs:build` → 复制 `.vitepress/dist/` 到 `_site/{目录名}/`
+   - `mdbook`: `mdbook build`（在 book.toml 所在目录）→ 复制 `book/` 到 `_site/{目录名}/`
 3. 其他框架值 → 跳过并警告
 
 CI **不使用**版本字段（构建与版本无关）。

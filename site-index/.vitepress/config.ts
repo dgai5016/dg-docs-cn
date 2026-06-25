@@ -1,12 +1,36 @@
 import { defineConfig } from 'vitepress'
+import { fileURLToPath, URL } from 'node:url'
+
+const projectSearchBoxPath = fileURLToPath(
+  new URL('./theme/components/ProjectSearchBox.vue', import.meta.url)
+)
 
 export default defineConfig({
   lang: 'zh-CN',
   title: '中文技术文档合集',
-  description: '个人维护的英文技术文档中文翻译合集',
+  description: '英文技术文档中文翻译合集',
   base: '/dg-docs-cn/',
   cleanUrls: true,
   lastUpdated: true,
+
+  vite: {
+    plugins: [
+      {
+        name: 'dg-replace-local-search',
+        enforce: 'pre',
+        resolveId(source, importer) {
+          if (
+            source.endsWith('VPLocalSearchBox.vue') &&
+            importer &&
+            importer.includes('vitepress')
+          ) {
+            return projectSearchBoxPath
+          }
+          return null
+        }
+      }
+    ]
+  },
 
   themeConfig: {
     siteTitle: '中文技术文档合集',

@@ -1,0 +1,15 @@
+[book]
+authors = ["SilentVoid13"]
+language = "zh-cn"
+src = "src"
+title = "Templater"
+
+[preprocessor.tera]
+command = "mdbook-tera --toml ./documentation.toml"
+
+[preprocessor.toc]
+command = "mdbook-toc"
+renderer = ["html"]
+
+[output.html]
+site-url = "/dg-docs-cn/templater/"
