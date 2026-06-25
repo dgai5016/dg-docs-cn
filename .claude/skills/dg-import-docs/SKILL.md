@@ -141,7 +141,7 @@ cp "{源目录}/.source-version.json" "$TARGET_DIR/.source-version.json"
 #   - 删除 edit_uri（如果用户不想保留"编辑此页"链接）
 ```
 
-详见框架适配器指引（外部 skill `dg-translate-tech-docs` 的 references）。
+详见框架适配器指引（`dg-translate-tech-docs` 的 references）。
 
 **更新模式下**：base 配置通常无需再改（首次搬运时已配过）；只检查 mkdocs.yml 的 `nav` 是否需要重新翻译（如果变更文件包含 mkdocs.yml 本身）。
 

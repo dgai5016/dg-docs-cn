@@ -11,7 +11,7 @@ dg-docs-cn/
 │   ├── mkdocs.yml 或 .vitepress/    # 原框架配置
 │   ├── docs/                         # 中文 markdown
 │   └── .project.json                 # 项目元信息
-├── .claude/skills/                   # 用户专属 skills（搬运 + 编排）
+├── .claude/skills/                   # 翻译 + 搬运 + 编排 skills
 └── .github/workflows/deploy.yml      # 自动构建部署
 ```
 
@@ -29,17 +29,19 @@ dg-docs-cn/
 /dg-translate-and-import github.com/{owner}/{repo}
 ```
 
-它会调用 `dg-translate-tech-docs`（来自 dg-skills marketplace）翻译文档，
-然后调用 `dg-import-docs`（本仓库内）把翻译产物搬运到本仓库的子目录、
+它会调用本仓库内置的 `dg-translate-tech-docs` 翻译文档，
+然后调用 `dg-import-docs` 把翻译产物搬运到本仓库的子目录、
 配置好 base URL、生成 `.project.json`、纳入索引页。
 
 ## Skill 分布
 
-| Skill | 位置 | 通用性 |
-|-------|------|--------|
-| `dg-translate-tech-docs` | 外部仓库 `dg-skills` | ✅ 通用，可发布 |
-| `dg-import-docs` | `.claude/skills/` | ❌ 本仓库专属 |
-| `dg-translate-and-import` | `.claude/skills/` | ❌ 本仓库专属 |
+所有 skill 都在本仓库 `.claude/skills/`，组成完整的"翻译 → 搬运 → 索引"工作流：
+
+| Skill | 职责 |
+|-------|------|
+| `dg-translate-tech-docs` | 翻译引擎：英文文档 → 中文，保留原框架 |
+| `dg-import-docs` | 搬运：翻译产物 → dg-docs-cn/{项目名}/ |
+| `dg-translate-and-import` | 编排：翻译 + 搬运一条龙 |
 
 ## 部署机制
 

@@ -17,10 +17,10 @@ version: 1.1.0
 
 由两个 skill 组合而成：
 
-| 阶段 | Skill | 来源 |
+| 阶段 | Skill | 位置 |
 |------|-------|------|
-| 1. 翻译 | `dg-translate-tech-docs` | dg-skills marketplace（外部通用 skill） |
-| 2. 搬运 | `dg-import-docs` | 本仓库 `.claude/skills/`（专属 skill） |
+| 1. 翻译 | `dg-translate-tech-docs` | 本仓库 `.claude/skills/` |
+| 2. 搬运 | `dg-import-docs` | 本仓库 `.claude/skills/` |
 
 ## User Input Tools
 
