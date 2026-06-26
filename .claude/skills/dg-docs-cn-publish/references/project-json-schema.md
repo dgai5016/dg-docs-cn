@@ -50,7 +50,7 @@
 | `last_updated_at` | string (date) | ❌ | **最近一次**更新翻译的日期；首次翻译时与 `translated_at` 相同 |
 | `update_count` | integer | ❌ | 累计更新次数；首次为 0，每次更新 +1 |
 
-**版本字段来源**：从 `.source-version.json`（dg-translate-tech-docs 1.1+ 的产物）合并：
+**版本字段来源**：从 `.source-version.json`（`dg-docs-cn-translate` 的产物）合并：
 - `.source-version.json.branch` → `original_branch`
 - `.source-version.json.commit` → `original_commit`
 - `.source-version.json.commit_short` → `original_commit_short`
@@ -66,7 +66,7 @@
 
 ## 校验规则
 
-- `name` 必须与项目目录名一致
+- `name` 必须与项目目录名一致，且**严格等于原仓库名**（不接受用户自定义，由 URL 推导）
 - `name` 仅允许小写字母、数字、连字符（kebab-case）
 - `framework` 必须是 `mkdocs` / `vitepress` / `mdbook`
 - `translated_at` / `last_updated_at` / `original_commit_date` 必须是有效的 YYYY-MM-DD
@@ -102,7 +102,7 @@ CI **不使用**版本字段（构建与版本无关）。
 
 ## 更新模式下哪些字段会变
 
-`dg-translate-and-import` 触发更新时，`dg-import-docs` 只修改版本字段，其他保持不动：
+`dg-docs-cn`（主入口）触发更新时，`dg-docs-cn-publish` 只修改版本字段，其他保持不动：
 
 | 字段 | 更新时变化 |
 |------|----------|

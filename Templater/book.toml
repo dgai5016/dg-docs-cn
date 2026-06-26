@@ -12,4 +12,4 @@ command = "mdbook-toc"
 renderer = ["html"]
 
 [output.html]
-site-url = "/dg-docs-cn/templater/"
+site-url = "/dg-docs-cn/Templater/"

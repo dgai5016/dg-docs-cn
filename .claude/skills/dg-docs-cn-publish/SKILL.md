@@ -1,23 +1,25 @@
 ---
-name: dg-import-docs
-description: Imports an already-translated Chinese documentation project into the dg-docs-cn repository. Takes a translated project directory (output of dg-translate-tech-docs) and places it under dg-docs-cn/{name}/, adjusts deployment config (VitePress base URL, etc.), creates .project.json (with original commit info from .source-version.json), and registers it in the site-index. Supports both 新建模式 (first-time import) and 更新模式 (incremental update). Use when user says "搬运到 dg-docs-cn", "导入到 dg-docs-cn", "更新 dataview 翻译", or invokes /dg-import-docs with a local project path. This skill is dg-docs-cn specific — not portable to other destination repos.
-version: 1.1.0
+name: dg-docs-cn-publish
+description: Publishing stage of the dg-docs-cn pipeline. Takes a translated project directory (output of dg-docs-cn-translate) and lands it under dg-docs-cn/{repo-name}/, adjusts deployment config (VitePress base URL, MkDocs site_url, mdBook site-url), creates/updates .project.json (with original commit info from .source-version.json), and rebuilds the site-index. Supports both 新建模式 (first-time publish) and 更新模式 (incremental update via .changed-files.json). Bound to dg-docs-cn repo layout.
+version: 2.0.0
 ---
 
-# Import Docs into dg-docs-cn
+# Publish: 落地到 dg-docs-cn
+
+dg-docs-cn 流水线的第三阶段，被 `dg-docs-cn` 主入口调用。
 
 把已经翻译好的中文文档项目搬运到 `dg-docs-cn` 仓库，配置好部署相关参数，纳入索引页。**支持首次搬运和增量更新两种模式。**
 
-**前置条件**：被搬运的目录必须是 `dg-translate-tech-docs` 的产物（含框架配置 + `.source-version.json`）。
+**前置条件**：被搬运的目录必须是 `dg-docs-cn-translate` 的产物（含框架配置 + `.source-version.json`）。
 
 **职责边界**：
-- ✅ 复制项目（或变更文件）到 `dg-docs-cn/{name}/`
+- ✅ 复制项目（或变更文件）到 `dg-docs-cn/{repo-name}/`
 - ✅ 修改 VitePress 的 `base` 字段
 - ✅ 检查 MkDocs 的 `site_url` 是否需要清理
 - ✅ 创建/更新 `.project.json`，合并 `.source-version.json` 的版本字段
 - ✅ 触发索引页重建
 - ✅ **更新模式**：根据 `.changed-files.json` 只复制变更文件，避免覆盖未翻译的英文原文
-- ❌ **不做翻译**——翻译由 `dg-translate-tech-docs` 完成
+- ❌ **不做翻译**——翻译由 `dg-docs-cn-translate` 完成
 - ❌ **不自动 push**——让用户验证后手动 push
 
 ## User Input Tools
@@ -28,6 +30,32 @@ When this skill prompts the user, follow this tool-selection rule (priority orde
 2. **Fallback**: if no such tool exists, emit a numbered plain-text message and ask the user to reply with the chosen number/answer for each question.
 3. **Batching**: if the tool supports multiple questions per call, combine all applicable questions into a single call; if only single-question, ask them one at a time in priority order.
 
+## Reading the Work Order
+
+**作为 dg-docs-cn 流水线一员调用时**，主入口 `dg-docs-cn` 会通过会话上下文传一份 work order JSON（来自 `dg-docs-cn-prepare`）。从 work order 提取：
+
+| 字段 | 用途 |
+|------|------|
+| `mode` | `new` / `update` / `noop` / `legacy` / `bad_object` / `error`。**信任这个字段**，不再用目录存在性自动判别 |
+| `project_slug` | 目标目录名（**严格 = 原仓库名**，不接受用户覆盖） |
+| `framework` | 信任，决定改哪些部署参数 |
+| `update_count_before` | 自增后写入 `.project.json` 的 `update_count` |
+| `deleted_files` / `renamed_files` | 知情即可（删除的保留中文版，重命名的提示用户手动处理） |
+
+**Fallback**：若会话内找不到 work order，从 `--work-order-file` 参数指向的 JSON 文件读：
+
+```bash
+WORK_ORDER=$(cat "$WORK_ORDER_FILE")
+```
+
+**`noop` / `legacy` / `bad_object` / `error` 模式**：主入口 `dg-docs-cn` 应在这些模式下根本不调用 publish。若被调用到了，立即退出并报告「work order 模式为 {mode}，publish 不应被触发」。
+
+**Standalone 调用**（无 work order）：用户给一个本地翻译目录路径。本 skill 此时**回退到旧行为**——通过目标目录存在性判别 new/update：
+
+```bash
+if [ -f "$TARGET_DIR/.project.json" ]; then MODE="update"; else MODE="new"; fi
+```
+
 ## Workflow
 
 ### Step 1: Locate dg-docs-cn Repo Root
@@ -36,42 +64,44 @@ When this skill prompts the user, follow this tool-selection rule (priority orde
 # 优先用 git
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 
-# fallback：从当前目录向上找含 .claude/skills/dg-import-docs 的目录
+# fallback：从当前目录向上找含 .claude/skills/dg-docs-cn-publish 的目录
 [ -z "$REPO_ROOT" ] && REPO_ROOT=$(cd "$(dirname "$0")/../../../.." && pwd)
 ```
 
 本 skill 应该被从 dg-docs-cn 仓库内触发，正常情况下 cwd 就是仓库根。
 
-### Step 2: Verify Source Project & Detect Mode
+### Step 2: Verify Source Project & Resolve Mode
 
 检查用户提供的源目录（参数）：
 
 | 检查项 | 含义 |
 |--------|------|
 | 含 `mkdocs.yml` / `.vitepress/config.{ts,js}` / `book.toml` | 是有效的翻译产物 |
-| 含 `.source-version.json` | dg-translate-tech-docs 1.1+ 产物，含原文 commit 等版本信息 |
+| 含 `.source-version.json` | dg-docs-cn-translate 产物，含原文 commit 等版本信息 |
 | 含 `.changed-files.json` | 增量翻译产物，列出本次变更的文件清单 |
 
 **如果都不是有效框架** → 报错退出：「源目录不是有效的翻译产物，缺少 mkdocs.yml / .vitepress/config.{ts,js} / book.toml」
 
-**如果缺少 `.source-version.json`** → 警告：「未检测到版本信息，.project.json 的版本字段将为空。建议用 dg-translate-tech-docs 1.1+ 重新生成。」继续执行（版本字段留空）。
+**如果缺少 `.source-version.json`** → 警告：「未检测到版本信息，.project.json 的版本字段将为空。建议用 dg-docs-cn-translate 重新生成。」继续执行（版本字段留空）。
 
-### Step 3: Collect Parameters
-
-**自动判别模式：**
+**模式判别**：
 
 ```bash
-TARGET_DIR="$REPO_ROOT/{项目目录名}"
-PROJECT_JSON="$TARGET_DIR/.project.json"
-
-if [ -f "$PROJECT_JSON" ]; then
-  MODE="update"    # 更新模式
+TARGET_DIR="$REPO_ROOT/$SLUG"
+if [ -n "$WORK_ORDER_MODE" ]; then
+  MODE="$WORK_ORDER_MODE"   # 信任 work order
+elif [ -f "$TARGET_DIR/.project.json" ]; then
+  MODE="update"              # standalone 回退
 else
-  MODE="new"       # 新建模式
+  MODE="new"
 fi
 ```
 
-通过用户输入工具问以下问题（新建模式问全部；更新模式大部分从现有 .project.json 继承）：
+### Step 3: Collect Parameters
+
+**有 work order**：slug、framework、update_count_before 都从 work order 取，**不问用户**。`title` / `description` 在新建模式下从源项目配置读取（如 mkdocs.yml 的 `site_name`、README 的描述），无法推断时再问。
+
+**Standalone 无 work order**：通过用户输入工具问以下问题（新建模式问全部；更新模式大部分从现有 .project.json 继承）：
 
 | 问题 | 新建模式默认 | 更新模式默认 |
 |------|------------|------------|
@@ -86,7 +116,7 @@ fi
 ### Step 4: 新建模式 → 复制整个项目
 
 ```bash
-TARGET_DIR="$REPO_ROOT/{项目目录名}"
+TARGET_DIR="$REPO_ROOT/$SLUG"
 
 # 新建模式：复制整个源目录
 cp -r "{源目录}/." "$TARGET_DIR/"
@@ -102,7 +132,7 @@ rm -f "$TARGET_DIR/.changed-files.json"
 
 ### Step 4 (Update): 更新模式 → 只复制变更文件
 
-更新模式下，源目录是 dg-translate-tech-docs 增量模式的输出：
+更新模式下，源目录是 dg-docs-cn-translate 增量模式的输出：
 - 变更文件：新的中文翻译
 - 未变更文件：英文原文（不能覆盖中文版！）
 - `.source-version.json`：新版本信息
@@ -124,7 +154,7 @@ cp "{源目录}/.source-version.json" "$TARGET_DIR/.source-version.json"
 # 不复制 .changed-files.json（中间产物，搬运完成无意义）
 ```
 
-**如果 `.changed-files.json` 不存在**：警告用户「未检测到变更清单，将全量复制（可能覆盖未翻译文件）。建议用 dg-translate-tech-docs 增量模式重新生成」。询问用户确认后，走新建模式的 cp -r 逻辑。
+**如果 `.changed-files.json` 不存在**：警告用户「未检测到变更清单，将全量复制（可能覆盖未翻译文件）。建议用 dg-docs-cn-translate 增量模式重新生成」。询问用户确认后，走新建模式的 cp -r 逻辑。
 
 跳到 **Step 5**。
 
@@ -141,7 +171,7 @@ cp "{源目录}/.source-version.json" "$TARGET_DIR/.source-version.json"
 #   - 删除 edit_uri（如果用户不想保留"编辑此页"链接）
 ```
 
-详见框架适配器指引（`dg-translate-tech-docs` 的 references）。
+详见框架适配器指引（`dg-docs-cn-translate` 的 references）。
 
 **更新模式下**：base 配置通常无需再改（首次搬运时已配过）；只检查 mkdocs.yml 的 `nav` 是否需要重新翻译（如果变更文件包含 mkdocs.yml 本身）。
 
@@ -151,7 +181,7 @@ cp "{源目录}/.source-version.json" "$TARGET_DIR/.source-version.json"
 
 ```typescript
 // 编辑 $TARGET_DIR/.vitepress/config.{ts,js}
-base: '/dg-docs-cn/{项目目录名}/'
+base: '/dg-docs-cn/{SLUG}/'
 ```
 
 **更新模式下**：base 已在首次搬运时配置好，无需改。
@@ -165,7 +195,7 @@ mdBook 默认用相对路径构建，**通常无需改 `book.toml`**。
 ```toml
 # 编辑 $TARGET_DIR/book.toml（或 $TARGET_DIR/docs/book.toml，看 detect 结果）
 [output.html]
-site-url = "/dg-docs-cn/{项目目录名}/"
+site-url = "/dg-docs-cn/{SLUG}/"
 ```
 
 **更新模式下**：site-url 已在首次搬运时配置好，无需改。
@@ -185,21 +215,21 @@ language = "zh-cn"
 
 ```json
 {
-  "name": "dataview",
-  "title": "Obsidian Dataview 中文文档",
-  "description": "Obsidian Dataview 插件官方文档中文翻译",
-  "original_url": "https://blacksmithgu.github.io/obsidian-dataview/",
-  "original_repo": "https://github.com/blacksmithgu/obsidian-dataview",
+  "name": "{SLUG}",
+  "title": "{项目标题}",
+  "description": "{项目描述}",
+  "original_url": "{原文在线站点 URL}",
+  "original_repo": "https://github.com/{owner}/{repo}",
 
-  "original_branch": "master",
-  "original_commit": "abc123def4567890abcdef1234567890abcdef12",
-  "original_commit_short": "abc123d",
-  "original_commit_date": "2026-06-15",
+  "original_branch": "{branch}",
+  "original_commit": "{full_sha}",
+  "original_commit_short": "{short_sha}",
+  "original_commit_date": "{YYYY-MM-DD}",
 
-  "framework": "mkdocs",
+  "framework": "{mkdocs|vitepress|mdbook}",
   "source_docs_path": "docs/",
-  "translated_at": "2026-06-24",
-  "last_updated_at": "2026-06-24",
+  "translated_at": "{今天日期}",
+  "last_updated_at": "{今天日期}",
   "update_count": 0,
   "status": "complete"
 }
@@ -226,9 +256,11 @@ language = "zh-cn"
   "original_commit_short": "{新 source-version 的 commit_short}",
   "original_commit_date": "{新 source-version 的 commit_date}",
   "last_updated_at": "{今天日期}",
-  "update_count": "{原值 + 1}"
+  "update_count": "{work_order.update_count_before + 1}"
 }
 ```
+
+**`update_count` 自增**：值 = work order 的 `update_count_before + 1`。若 standalone 模式无 work order，从现有 `.project.json` 读 `update_count` 再 +1。
 
 `name` / `title` / `description` / `original_url` / `original_repo` / `framework` / `translated_at` / `status` 保持不动。
 
@@ -272,9 +304,9 @@ npm run dev     # http://127.0.0.1:5173/
 #### 新建模式报告
 
 ```
-✅ 已搬运到 dg-docs-cn（新建模式）
+✅ 已发布到 dg-docs-cn（新建模式）
 
-项目: {项目名}
+项目: {SLUG}
 位置: {TARGET_DIR}
 框架: {framework}
 原文: {original_url}
@@ -286,19 +318,19 @@ npm run dev     # http://127.0.0.1:5173/
   访问: {本地URL}
 
 部署后的 URL（push 后）:
-  https://dgai5016.github.io/dg-docs-cn/{项目名}/
+  https://dgai5016.github.io/dg-docs-cn/{SLUG}/
 
-下一步：
+下一步:
   cd {REPO_ROOT}
   git add .
-  git commit -m "feat: 添加 {项目名} 中文文档"
+  git commit -m "feat: 添加 {SLUG} 中文文档"
   git push
 ```
 
 #### 更新模式报告
 
 ```
-✅ 已更新 dg-docs-cn/{项目名}（更新模式）
+✅ 已更新 dg-docs-cn/{SLUG}（更新模式）
 
 本次更新:
   原文版本: {old_short} ({old_date}) → {new_short} ({new_date})
@@ -314,10 +346,10 @@ npm run dev     # http://127.0.0.1:5173/
   cd {TARGET_DIR} && {启动命令}
   访问: {本地URL}
 
-下一步：
+下一步:
   cd {REPO_ROOT}
   git add .
-  git commit -m "chore: 更新 {项目名} 翻译至 {new_short}"
+  git commit -m "chore: 更新 {SLUG} 翻译至 {new_short}"
   git push
 ```
 
@@ -330,10 +362,11 @@ npm run dev     # http://127.0.0.1:5173/
 
 | 失败场景 | 应对 |
 |---------|------|
-| 源目录无效（无框架配置） | 报错退出，提示先用 `dg-translate-tech-docs` 翻译 |
+| 源目录无效（无框架配置） | 报错退出，提示先用 `dg-docs-cn-translate` 翻译 |
 | 目标目录已存在 + 新建模式 | 询问：切换到更新模式 / 改名 / 取消 |
 | `.changed-files.json` 缺失 + 更新模式 | 警告 + 询问：全量复制（风险：覆盖未翻译文件）/ 取消 |
 | `.source-version.json` 缺失 | 警告，版本字段留空继续；建议重新生成 |
 | VitePress base 修改失败 | 跳过，警告用户手动确认 |
 | `npm install` 失败（网络问题） | 跳过，提示重试或换镜像源 |
 | 更新模式下原 commit 与新 commit 相同 | 警告「源版本未变，可能不需要更新」，仍允许继续（用户可能想强制重翻） |
+| Work order 模式为 noop/legacy/bad_object/error | 立即退出，主入口不应在此模式下调用 publish |

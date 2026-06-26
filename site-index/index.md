@@ -64,7 +64,7 @@ import projectsData from './.vitepress/projects.json'
 
 **暂无翻译项目**
 
-新项目添加后会自动出现在这里。在本仓库内触发 `dg-translate-and-import` skill 即可翻译一个新项目。
+新项目添加后会自动出现在这里。在本仓库内触发 `dg-docs-cn` skill 即可翻译一个新项目。
 
 </div>
 
