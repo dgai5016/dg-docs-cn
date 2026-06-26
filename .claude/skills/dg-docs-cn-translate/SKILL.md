@@ -1,7 +1,7 @@
 ---
 name: dg-docs-cn-translate
-description: Translator stage of the dg-docs-cn pipeline. Translates an English technical documentation repository from GitHub into Chinese, preserving the original site's framework (MkDocs Material, VitePress, or mdBook). Input comes from a work order produced by dg-docs-cn-prepare; output is a runnable Chinese-localized copy with .source-version.json and .changed-files.json. Can also run standalone with just a GitHub URL. Use when user says "翻译技术文档", "翻译英文文档", "把这个仓库的文档翻译成中文", or invokes /dg-docs-cn-translate.
-version: 2.0.0
+description: Translator stage of the dg-docs-cn pipeline. Translates an English technical documentation repository from GitHub into Chinese, preserving the original site's static site generator (MkDocs Material, VitePress, or mdBook). Input comes from a work order produced by dg-docs-cn-prepare; output is a runnable Chinese-localized copy with .changed-files.json (version info travels via work order, no separate provenance file). Can also run standalone with just a GitHub URL. Use when user says "翻译技术文档", "翻译英文文档", "把这个仓库的文档翻译成中文", or invokes /dg-docs-cn-translate.
+version: 2.1.0
 metadata:
   openclaw:
     requires:
@@ -11,14 +11,14 @@ metadata:
 
 # Translate (dg-docs-cn pipeline stage 2)
 
-把 GitHub 上的英文技术文档仓库翻译成中文版本，**保留原站点的框架与所有配置**。产物是一份「可运行的中文化原项目」。
+把 GitHub 上的英文技术文档仓库翻译成中文版本，**保留原站点的 SSG 与所有配置**。产物是一份「可运行的中文化原项目」。
 
 **职责边界（重要）：**
 
-- ✅ **做**：翻译 markdown 内容、翻译 nav/sidebar 标题、判断 site_name 是否需要翻译、输出 `.source-version.json` 和 `.changed-files.json`
-- ❌ **不做**：修改 base URL、修改 edit_uri/repo_url、创建目标仓库专属元信息、修改 CI/CD 配置、检测框架——这些属于其他阶段
+- ✅ **做**：翻译 markdown 内容、翻译 nav/sidebar 标题、判断 site_name 是否需要翻译、输出 `.changed-files.json`
+- ❌ **不做**：修改 base URL、修改 edit_uri/repo_url、创建目标仓库专属元信息、修改 CI/CD 配置、检测 SSG、写 `.source-version.json`——这些属于其他阶段
 
-判断标准：「产物是不是一份可运行的中文化原项目？」—— 文档站点能正常启动（mkdocs serve / npm run docs:dev / mdbook serve 不报错），所有 md 文件已翻译为中文，原框架与配置保留完整。
+判断标准：「产物是不是一份可运行的中文化原项目？」—— 文档站点能正常启动（mkdocs serve / npm run docs:dev / mdbook serve 不报错），所有 md 文件已翻译为中文，原 SSG 与配置保留完整。
 
 ## User Input Tools
 
@@ -35,7 +35,7 @@ When this skill prompts the user, follow this tool-selection rule (priority orde
 | 字段 | 用途 |
 |------|------|
 | `github_url` | 翻译目标仓库 |
-| `framework` | 直接信任，加载对应 `references/framework-*.md`（**不再自己检测**）|
+| `ssg` | 直接信任，加载对应 `references/ssg-*.md`（**不再自己检测**）|
 | `file_list` | `string[]` → 增量模式翻译这些文件；`"all"` → 全量模式 |
 | `translation_mode` | `quick` / `normal` / `refined` |
 | `clone_scope` | `docs-only` / `full` |
@@ -47,18 +47,18 @@ When this skill prompts the user, follow this tool-selection rule (priority orde
 WORK_ORDER=$(cat "$WORK_ORDER_FILE")
 ```
 
-**Standalone 调用**（无 work order）：用户直接给 GitHub URL，本 skill 走全量模式，框架自行检测——但**注意**：`detect-framework.sh` 已搬到 `dg-docs-cn-prepare`，standalone 模式下若需要检测，可临时跑 `find` 启发式判断，或要求用户在调用前先跑 prepare。
+**Standalone 调用**（无 work order）：用户直接给 GitHub URL，本 skill 走全量模式，SSG 自行检测——但**注意**：`detect-ssg.sh` 已搬到 `dg-docs-cn-prepare`，standalone 模式下若需要检测，可临时跑 `find` 启发式判断，或要求用户在调用前先跑 prepare。
 
-## Supported Frameworks
+## Supported SSGs
 
-| Framework | Status | Reference |
-|-----------|--------|-----------|
-| MkDocs Material | ✅ Supported | [references/framework-mkdocs.md](references/framework-mkdocs.md) |
-| VitePress | ✅ Supported | [references/framework-vitepress.md](references/framework-vitepress.md) |
-| mdBook | ✅ Supported | [references/framework-mdbook.md](references/framework-mdbook.md) |
-| Docusaurus / Astro Starlight / Nextra / GitBook / others | ❌ Rejected | Add a new `references/framework-xxx.md` to support |
+| SSG | Status | Reference |
+|-----|--------|-----------|
+| MkDocs Material | ✅ Supported | [references/ssg-mkdocs.md](references/ssg-mkdocs.md) |
+| VitePress | ✅ Supported | [references/ssg-vitepress.md](references/ssg-vitepress.md) |
+| mdBook | ✅ Supported | [references/ssg-mdbook.md](references/ssg-mdbook.md) |
+| Docusaurus / Astro Starlight / Nextra / GitBook / others | ❌ Rejected | Add a new `references/ssg-xxx.md` to support |
 
-**框架不在支持列表时**：报错退出，明确告诉用户「先去 `references/` 加 `framework-xxx.md` 适配器，再重新跑」。**不要**让 Claude 现场处理新框架——保证翻译流程的可预期性。
+**SSG 不在支持列表时**：报错退出，明确告诉用户「先去 `references/` 加 `ssg-xxx.md` 适配器，再重新跑」。**不要**让 Claude 现场处理新 SSG——保证翻译流程的可预期性。
 
 ## Workflow
 
@@ -68,7 +68,7 @@ WORK_ORDER=$(cat "$WORK_ORDER_FILE")
 
 ```bash
 GITHUB_URL=$(echo "$WORK_ORDER" | jq -r .github_url)
-FRAMEWORK=$(echo "$WORK_ORDER" | jq -r .framework)
+SSG=$(echo "$WORK_ORDER" | jq -r .ssg)
 FILE_LIST=$(echo "$WORK_ORDER" | jq -r '.file_list')
 TRANSLATION_MODE=$(echo "$WORK_ORDER" | jq -r .translation_mode)
 CLONE_SCOPE=$(echo "$WORK_ORDER" | jq -r .clone_scope)
@@ -109,7 +109,7 @@ git clone https://github.com/{owner}/{repo}.git /tmp/dg-translate-{repo}
 
 **注意**：少数项目的文档配置文件（如 `mkdocs.yml`）在仓库根，不在 `docs/` 下。Step 1 选择"整个仓库"即可处理。
 
-**临时 clone 保留**：不要立即删除 `/tmp/dg-translate-{repo}/`，Step 4 会从中读取 commit 信息。整个 skill 结束后再清理（清理归主入口 `dg-docs-cn`，本 skill 不删）。
+**临时 clone 保留**：不要立即删除 `/tmp/dg-translate-{repo}/`。整个 skill 结束后再清理（清理归主入口 `dg-docs-cn`，本 skill 不删）。
 
 ### Step 3: Apply Glossary from Prior Translation (Incremental Only)
 
@@ -132,7 +132,7 @@ fi
 
 **确定要翻译的文件清单：**
 
-- **全量模式**（`file_list = "all"` 或未传 `--files`）：用 `find {输出目录} -name "*.md"` 收集所有 md 文件（按框架适配器指引的范围）
+- **全量模式**（`file_list = "all"` 或未传 `--files`）：用 `find {输出目录} -name "*.md"` 收集所有 md 文件（按 SSG 适配器指引的范围）
 - **增量模式**（`file_list = [...]` 或传了 `--files`）：只处理清单中的文件，其他文件保持不动
 
 对清单中的每个 md 文件，逐个调用 **baoyu-translate**：
@@ -171,45 +171,9 @@ fi
 
 **全量模式下**：可选输出 `.changed-files.json`（包含全部 md 文件清单）；下游流程检测不到时按全量处理。
 
-### Step 5: Record Source Version
+### Step 5: Translate Navigation Config
 
-在翻译产物的根目录（`{输出目录}/.source-version.json`）写入原文版本信息：
-
-```json
-{
-  "repo": "https://github.com/{owner}/{repo}",
-  "branch": "{branch}",
-  "commit": "{full_sha}",
-  "commit_short": "{short_sha}",
-  "commit_date": "{YYYY-MM-DD}",
-  "commit_message": "{commit_subject}",
-  "captured_at": "{ISO 8601 timestamp}"
-}
-```
-
-**字段获取**（在临时 clone 目录 `/tmp/dg-translate-{repo}/` 中运行）：
-
-```bash
-# commit / commit_short / commit_date / commit_message
-git -C /tmp/dg-translate-{repo} log -1 --pretty=format:'%H%n%h%n%ad%n%s' --date=short
-
-# branch（默认分支）
-git -C /tmp/dg-translate-{repo} remote show origin | grep 'HEAD branch' | sed 's/.*: //'
-
-# captured_at
-date -u +"%Y-%m-%dT%H:%M:%SZ"
-```
-
-**为什么单独文件？**
-- `.source-version.json` 是本 skill 的产物，记录翻译基于的原文版本
-- 下游流程（`dg-docs-cn-publish`）读取它，把版本信息合并到 `.project.json` 的 `original_*` 字段
-- 本 skill 不需要知道 `.project.json` 的 schema——保持职责单一
-
-**增量模式下**：如果用户传入新的 `--output-dir`（覆盖现有翻译），重写 `.source-version.json`。如果输出目录已存在 `.source-version.json` 且未指定覆盖，警告用户「检测到现有版本 {old_short}，确认要用新版本 {new_short} 替换吗？」
-
-### Step 6: Translate Navigation Config
-
-按框架适配器指引，翻译 nav/sidebar 标题：
+按 SSG 适配器指引，翻译 nav/sidebar 标题：
 
 - **MkDocs**：编辑 `mkdocs.yml` 的 `nav` 字段，翻译每个标题文字（保留路径值不动）
 - **VitePress**：编辑 `.vitepress/config.{ts,js}` 的 `themeConfig.nav` 和 `themeConfig.sidebar` 的 `text` 字段
@@ -220,44 +184,43 @@ date -u +"%Y-%m-%dT%H:%M:%SZ"
 - 品牌/产品名（如 "Dataview"、"VitePress"）→ 保留原文
 - 不确定时询问用户
 
-### Step 7: Verify
+### Step 6: Verify
 
 ```bash
 # 检查所有 md 都翻译了（用 head 抽查前几行，确认是中文）
 find {输出目录} -name "*.md" | head -5 | xargs -I{} sh -c 'echo "=== {} ===" && head -3 {}'
 ```
 
-### Step 8: Report & Launch Preview
+### Step 7: Report & Launch Preview
 
 报告内容：
 ```
 ✅ 翻译完成
 
 仓库: {owner}/{repo}
-框架: {framework}
+SSG: {ssg}
 输出目录: {输出目录}
 翻译文件数: {N}
 失败文件: {失败清单或"无"}
 
 基于原文版本:
-  commit: {commit_short} ({commit_date})
-  branch: {branch}
-  完整 hash: {commit}
-  版本信息已写入: {输出目录}/.source-version.json
+  commit: {new_commit_short} ({new_commit_date})
 
-启动预览（{framework}）:
-{按框架给出的启动命令}
+启动预览（{ssg}）:
+{按 SSG 给出的启动命令}
 
 访问: {本地 URL}
 ```
 
-**启动预览命令**（按框架）：
+**版本信息流向**：本 skill **不写** `.source-version.json`；版本信息通过 work order（来自 prepare）传给 publish，最终写入 `.meta.json.original_*` 字段。standalone 模式下，commit 信息仅在终端报告里展示。
 
-| 框架 | 依赖安装 | 启动 | URL |
-|------|---------|------|-----|
+**启动预览命令**（按 SSG）：
+
+| SSG | 依赖安装 | 启动 | URL |
+|-----|---------|------|-----|
 | MkDocs | `pip install mkdocs-material` | `cd {输出目录} && mkdocs serve` | http://127.0.0.1:8000 |
 | VitePress | `cd {输出目录} && npm install` | `npm run docs:dev` 或 `npx vitepress dev` | http://127.0.0.1:5173 |
-| mdBook | `cargo install mdbook --version 0.4.52 --locked`（详见 framework-mdbook.md） | `cd {输出目录} && mdbook serve` | http://127.0.0.1:3000 |
+| mdBook | `cargo install mdbook --version 0.4.52 --locked`（详见 ssg-mdbook.md） | `cd {输出目录} && mdbook serve` | http://127.0.0.1:3000 |
 
 **主动询问**：「要不要现在就启动预览？」
 
@@ -275,12 +238,13 @@ find {输出目录} -name "*.md" | head -5 | xargs -I{} sh -c 'echo "=== {} ==="
 
 - ❌ 修改 `base` URL（VitePress 的 `base` / Docusaurus 的 `baseUrl`）—— `dg-docs-cn-publish` 负责
 - ❌ 修改 `edit_uri`、`repo_url`、`site_url` 等部署相关配置 —— `dg-docs-cn-publish` 负责
-- ❌ 创建目标仓库专属的元信息文件（`.project.json`）—— `dg-docs-cn-publish` 负责
+- ❌ 创建目标仓库专属的元信息文件（`.meta.json`）—— `dg-docs-cn-publish` 负责
 - ❌ 修改 CI/CD 配置（`.github/workflows/deploy.yml`）—— 仓库级，不动
-- ❌ 检测框架 —— `dg-docs-cn-prepare` 负责（standalone 模式例外）
+- ❌ 检测 SSG —— `dg-docs-cn-prepare` 负责（standalone 模式例外）
 - ❌ 跟踪 upstream 变化 / git diff —— `dg-docs-cn-prepare` 负责
+- ❌ **写 `.source-version.json`** —— 版本信息通过 work order 流转，不需要中间文件
 
-判断标准：「产物是不是一份可运行的中文化原项目？」—— 文档站点能正常启动，所有 md 文件已翻译为中文，原框架与配置保留完整。
+判断标准：「产物是不是一份可运行的中文化原项目？」—— 文档站点能正常启动，所有 md 文件已翻译为中文，原 SSG 与配置保留完整。
 
 ## Extension Support
 

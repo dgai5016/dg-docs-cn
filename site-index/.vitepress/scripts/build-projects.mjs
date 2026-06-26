@@ -2,7 +2,7 @@
 /**
  * build-projects.mjs
  *
- * 扫描仓库根的所有子目录，读取每个 .project.json，
+ * 扫描仓库根的所有子目录，读取每个 .meta.json，
  * 输出汇总到 .vitepress/projects.json，供首页 index.md 渲染项目卡片。
  *
  * 运行方式：node .vitepress/scripts/build-projects.mjs
@@ -51,7 +51,7 @@ async function main() {
 
   const projects = []
   for (const dir of projectDirs) {
-    const projectJsonPath = join(repoRoot, dir.name, '.project.json')
+    const projectJsonPath = join(repoRoot, dir.name, '.meta.json')
     if (!existsSync(projectJsonPath)) continue
 
     try {
@@ -62,20 +62,18 @@ async function main() {
         dirName: dir.name,
         title: data.title || data.name || dir.name,
         description: data.description || '',
-        framework: data.framework || 'unknown',
-        originalUrl: data.original_url || '',
+        ssg: data.ssg || 'unknown',
         originalRepo: data.original_repo || '',
         translatedAt: data.translated_at || '',
         status: data.status || 'unknown',
         originalCommitShort: data.original_commit_short || '',
         originalCommitDate: data.original_commit_date || '',
-        lastUpdatedAt: data.last_updated_at || '',
         updateCount: data.update_count ?? 0,
         // 用绝对 URL（带协议），避免被 VitePress 当成站内路由处理（SPA 客户端 404）
         url: `https://dgai5016.github.io/dg-docs-cn/${dir.name}/`
       })
     } catch (err) {
-      console.warn(`[build-projects] 跳过 ${dir.name}/.project.json：${err.message}`)
+      console.warn(`[build-projects] 跳过 ${dir.name}/.meta.json：${err.message}`)
     }
   }
 

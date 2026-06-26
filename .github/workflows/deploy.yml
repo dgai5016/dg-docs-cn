@@ -39,7 +39,7 @@ jobs:
       - name: Check if mdBook needed
         id: check_mdbook
         run: |
-          if find . -name .project.json -exec grep -l '"framework"[[:space:]]*:[[:space:]]*"mdbook"' {} \; 2>/dev/null | grep -q .; then
+          if find . -name .meta.json -exec grep -l '"ssg"[[:space:]]*:[[:space:]]*"mdbook"' {} \; 2>/dev/null | grep -q .; then
             echo "needs_mdbook=true" >> $GITHUB_OUTPUT
           else
             echo "needs_mdbook=false" >> $GITHUB_OUTPUT
@@ -80,15 +80,15 @@ jobs:
               site-index|.github|.claude|node_modules) continue ;;
             esac
 
-            if [ ! -f "$dir.project.json" ]; then
-              echo "[skip] $proj_name: no .project.json"
+            if [ ! -f "$dir.meta.json" ]; then
+              echo "[skip] $proj_name: no .meta.json"
               continue
             fi
 
-            framework=$(node -e "console.log(require('$dir.project.json').framework || 'unknown')")
-            echo "[build] $proj_name (framework=$framework)"
+            ssg=$(node -e "console.log(require('$dir.meta.json').ssg || 'unknown')")
+            echo "[build] $proj_name (ssg=$ssg)"
 
-            case "$framework" in
+            case "$ssg" in
               mkdocs)
                 (cd "$dir" && mkdocs build)
                 mkdir -p "_site/$proj_name"
@@ -104,7 +104,7 @@ jobs:
                 # 找 book.toml 所在目录（通常在 $dir/ 或 $dir/docs/）
                 book_toml=$(find "$dir" -maxdepth 3 -name book.toml | head -1)
                 if [ -z "$book_toml" ]; then
-                  echo "[error] $proj_name: framework=mdbook but no book.toml found"
+                  echo "[error] $proj_name: ssg=mdbook but no book.toml found"
                   continue
                 fi
                 book_dir=$(dirname "$book_toml")
@@ -113,7 +113,7 @@ jobs:
                 cp -r "$book_dir/book/"* "_site/$proj_name/"
                 ;;
               *)
-                echo "[warn] $proj_name: unsupported framework '$framework', skipping"
+                echo "[warn] $proj_name: unsupported ssg '$ssg', skipping"
                 ;;
             esac
           done

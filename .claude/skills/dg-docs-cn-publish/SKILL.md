@@ -1,7 +1,7 @@
 ---
 name: dg-docs-cn-publish
-description: Publishing stage of the dg-docs-cn pipeline. Takes a translated project directory (output of dg-docs-cn-translate) and lands it under dg-docs-cn/{repo-name}/, adjusts deployment config (VitePress base URL, MkDocs site_url, mdBook site-url), creates/updates .project.json (with original commit info from .source-version.json), and rebuilds the site-index. Supports both 新建模式 (first-time publish) and 更新模式 (incremental update via .changed-files.json). Bound to dg-docs-cn repo layout.
-version: 2.0.0
+description: Publishing stage of the dg-docs-cn pipeline. Takes a translated project directory (output of dg-docs-cn-translate) and lands it under dg-docs-cn/{repo-name}/, adjusts deployment config (VitePress base URL, MkDocs site_url, mdBook site-url), creates/updates .meta.json (with original commit info from work order's new_commit_* fields), and rebuilds the site-index. Supports both 新建模式 (first-time publish) and 更新模式 (incremental update via .changed-files.json). Bound to dg-docs-cn repo layout.
+version: 2.1.0
 ---
 
 # Publish: 落地到 dg-docs-cn
@@ -10,13 +10,13 @@ dg-docs-cn 流水线的第三阶段，被 `dg-docs-cn` 主入口调用。
 
 把已经翻译好的中文文档项目搬运到 `dg-docs-cn` 仓库，配置好部署相关参数，纳入索引页。**支持首次搬运和增量更新两种模式。**
 
-**前置条件**：被搬运的目录必须是 `dg-docs-cn-translate` 的产物（含框架配置 + `.source-version.json`）。
+**前置条件**：被搬运的目录必须是 `dg-docs-cn-translate` 的产物（含 SSG 配置 + `.changed-files.json`）。
 
 **职责边界**：
 - ✅ 复制项目（或变更文件）到 `dg-docs-cn/{repo-name}/`
 - ✅ 修改 VitePress 的 `base` 字段
 - ✅ 检查 MkDocs 的 `site_url` 是否需要清理
-- ✅ 创建/更新 `.project.json`，合并 `.source-version.json` 的版本字段
+- ✅ 创建/更新 `.meta.json`，从 work order 的 `new_commit_*` 字段填入版本信息
 - ✅ 触发索引页重建
 - ✅ **更新模式**：根据 `.changed-files.json` 只复制变更文件，避免覆盖未翻译的英文原文
 - ❌ **不做翻译**——翻译由 `dg-docs-cn-translate` 完成
@@ -38,8 +38,9 @@ When this skill prompts the user, follow this tool-selection rule (priority orde
 |------|------|
 | `mode` | `new` / `update` / `noop` / `legacy` / `bad_object` / `error`。**信任这个字段**，不再用目录存在性自动判别 |
 | `project_slug` | 目标目录名（**严格 = 原仓库名**，不接受用户覆盖） |
-| `framework` | 信任，决定改哪些部署参数 |
-| `update_count_before` | 自增后写入 `.project.json` 的 `update_count` |
+| `ssg` | 信任，决定改哪些部署参数 |
+| `new_commit` / `new_commit_short` / `new_commit_date` | 写入 `.meta.json` 的 `original_commit*` 字段 |
+| `update_count_before` | 自增后写入 `.meta.json` 的 `update_count` |
 | `deleted_files` / `renamed_files` | 知情即可（删除的保留中文版，重命名的提示用户手动处理） |
 
 **Fallback**：若会话内找不到 work order，从 `--work-order-file` 参数指向的 JSON 文件读：
@@ -53,8 +54,10 @@ WORK_ORDER=$(cat "$WORK_ORDER_FILE")
 **Standalone 调用**（无 work order）：用户给一个本地翻译目录路径。本 skill 此时**回退到旧行为**——通过目标目录存在性判别 new/update：
 
 ```bash
-if [ -f "$TARGET_DIR/.project.json" ]; then MODE="update"; else MODE="new"; fi
+if [ -f "$TARGET_DIR/.meta.json" ]; then MODE="update"; else MODE="new"; fi
 ```
+
+**standalone 模式下版本字段处理**：无 work order 时无法填 `original_commit*` 字段——这些字段留空。publish 增加警告「未检测到 work order，版本字段将为空」。
 
 ## Workflow
 
@@ -77,12 +80,9 @@ REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 | 检查项 | 含义 |
 |--------|------|
 | 含 `mkdocs.yml` / `.vitepress/config.{ts,js}` / `book.toml` | 是有效的翻译产物 |
-| 含 `.source-version.json` | dg-docs-cn-translate 产物，含原文 commit 等版本信息 |
 | 含 `.changed-files.json` | 增量翻译产物，列出本次变更的文件清单 |
 
-**如果都不是有效框架** → 报错退出：「源目录不是有效的翻译产物，缺少 mkdocs.yml / .vitepress/config.{ts,js} / book.toml」
-
-**如果缺少 `.source-version.json`** → 警告：「未检测到版本信息，.project.json 的版本字段将为空。建议用 dg-docs-cn-translate 重新生成。」继续执行（版本字段留空）。
+**如果都不是有效 SSG 配置** → 报错退出：「源目录不是有效的翻译产物，缺少 mkdocs.yml / .vitepress/config.{ts,js} / book.toml」
 
 **模式判别**：
 
@@ -90,7 +90,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 TARGET_DIR="$REPO_ROOT/$SLUG"
 if [ -n "$WORK_ORDER_MODE" ]; then
   MODE="$WORK_ORDER_MODE"   # 信任 work order
-elif [ -f "$TARGET_DIR/.project.json" ]; then
+elif [ -f "$TARGET_DIR/.meta.json" ]; then
   MODE="update"              # standalone 回退
 else
   MODE="new"
@@ -99,17 +99,16 @@ fi
 
 ### Step 3: Collect Parameters
 
-**有 work order**：slug、framework、update_count_before 都从 work order 取，**不问用户**。`title` / `description` 在新建模式下从源项目配置读取（如 mkdocs.yml 的 `site_name`、README 的描述），无法推断时再问。
+**有 work order**：slug、ssg、update_count_before、new_commit_* 都从 work order 取，**不问用户**。`title` / `description` 在新建模式下从源项目配置读取（如 mkdocs.yml 的 `site_name`、README 的描述），无法推断时再问。
 
-**Standalone 无 work order**：通过用户输入工具问以下问题（新建模式问全部；更新模式大部分从现有 .project.json 继承）：
+**Standalone 无 work order**：通过用户输入工具问以下问题（新建模式问全部；更新模式大部分从现有 `.meta.json` 继承）：
 
 | 问题 | 新建模式默认 | 更新模式默认 |
 |------|------------|------------|
-| 项目目录名 | 源目录 basename | **从现有 .project.json 读 name**，不允许改 |
-| 项目标题 | 从源项目配置读取 | 从现有 .project.json 读 |
-| 项目描述 | 空 | 从现有 .project.json 读 |
-| 原文 URL | 空 | 从现有 .project.json 读 |
-| 原文仓库 URL | 空 | 从现有 .project.json 读 |
+| 项目目录名 | 源目录 basename | **从现有 .meta.json 读 name**，不允许改 |
+| 项目标题 | 从源项目配置读取 | 从现有 .meta.json 读 |
+| 项目描述 | 空 | 从现有 .meta.json 读 |
+| 原文仓库 URL | 空 | 从现有 .meta.json 读 |
 
 如果用户提供了 `original_repo` URL，可以从中推断 owner/repo。
 
@@ -135,7 +134,6 @@ rm -f "$TARGET_DIR/.changed-files.json"
 更新模式下，源目录是 dg-docs-cn-translate 增量模式的输出：
 - 变更文件：新的中文翻译
 - 未变更文件：英文原文（不能覆盖中文版！）
-- `.source-version.json`：新版本信息
 - `.changed-files.json`：本次变更的文件清单
 
 ```bash
@@ -148,9 +146,6 @@ for rel_path in $CHANGED_FILES; do
   cp "{源目录}/$rel_path" "$TARGET_DIR/$rel_path"
 done
 
-# 复制 .source-version.json（新版本）
-cp "{源目录}/.source-version.json" "$TARGET_DIR/.source-version.json"
-
 # 不复制 .changed-files.json（中间产物，搬运完成无意义）
 ```
 
@@ -160,7 +155,7 @@ cp "{源目录}/.source-version.json" "$TARGET_DIR/.source-version.json"
 
 ### Step 5: Adjust Deployment Config
 
-按框架修改部署相关配置。
+按 SSG 修改部署相关配置。
 
 #### MkDocs
 
@@ -171,7 +166,7 @@ cp "{源目录}/.source-version.json" "$TARGET_DIR/.source-version.json"
 #   - 删除 edit_uri（如果用户不想保留"编辑此页"链接）
 ```
 
-详见框架适配器指引（`dg-docs-cn-translate` 的 references）。
+详见 SSG 适配器指引（`dg-docs-cn-translate` 的 references）。
 
 **更新模式下**：base 配置通常无需再改（首次搬运时已配过）；只检查 mkdocs.yml 的 `nav` 是否需要重新翻译（如果变更文件包含 mkdocs.yml 本身）。
 
@@ -207,43 +202,37 @@ site-url = "/dg-docs-cn/{SLUG}/"
 language = "zh-cn"
 ```
 
-### Step 6: Create or Update .project.json
+### Step 6: Create or Update .meta.json
 
 #### 新建模式：创建
 
-读 `{源目录}/.source-version.json`（如果存在），合并到 `.project.json`：
+从 work order 的 `new_commit_*` 字段填入版本信息，加上项目身份字段：
 
 ```json
 {
   "name": "{SLUG}",
   "title": "{项目标题}",
   "description": "{项目描述}",
-  "original_url": "{原文在线站点 URL}",
+  "ssg": "{mkdocs|vitepress|mdbook}",
+  "status": "complete",
   "original_repo": "https://github.com/{owner}/{repo}",
-
-  "original_branch": "{branch}",
-  "original_commit": "{full_sha}",
-  "original_commit_short": "{short_sha}",
-  "original_commit_date": "{YYYY-MM-DD}",
-
-  "framework": "{mkdocs|vitepress|mdbook}",
-  "source_docs_path": "docs/",
+  "original_commit": "{work_order.new_commit}",
+  "original_commit_short": "{work_order.new_commit_short}",
+  "original_commit_date": "{work_order.new_commit_date}",
   "translated_at": "{今天日期}",
-  "last_updated_at": "{今天日期}",
-  "update_count": 0,
-  "status": "complete"
+  "update_count": 0
 }
 ```
 
-字段说明详见 [references/project-json-schema.md](references/project-json-schema.md)。
+字段说明详见 [references/meta-json-schema.md](references/meta-json-schema.md)。
 
-**版本字段来源**：从 `.source-version.json` 映射：
-- `.source-version.json` → `.project.json`
-- `branch` → `original_branch`
-- `commit` → `original_commit`
-- `commit_short` → `original_commit_short`
-- `commit_date` → `original_commit_date`
-- `captured_at` → `translated_at`（取日期部分）
+**版本字段来源**：从 work order 映射：
+- `work_order.new_commit` → `.meta.json.original_commit`
+- `work_order.new_commit_short` → `.meta.json.original_commit_short`
+- `work_order.new_commit_date` → `.meta.json.original_commit_date`（真实 upstream commit 日期，非"今天"）
+- `work_order.ssg` → `.meta.json.ssg`
+- （publish 自己取日期）→ `.meta.json.translated_at`
+- （用户输入或从 `original_repo` 推断）→ `.meta.json.original_repo`
 
 #### 更新模式：增量更新字段
 
@@ -251,18 +240,16 @@ language = "zh-cn"
 
 ```json
 {
-  "original_branch": "{新 source-version 的 branch}",
-  "original_commit": "{新 source-version 的 commit}",
-  "original_commit_short": "{新 source-version 的 commit_short}",
-  "original_commit_date": "{新 source-version 的 commit_date}",
-  "last_updated_at": "{今天日期}",
+  "original_commit": "{work_order.new_commit}",
+  "original_commit_short": "{work_order.new_commit_short}",
+  "original_commit_date": "{work_order.new_commit_date}",
   "update_count": "{work_order.update_count_before + 1}"
 }
 ```
 
-**`update_count` 自增**：值 = work order 的 `update_count_before + 1`。若 standalone 模式无 work order，从现有 `.project.json` 读 `update_count` 再 +1。
+**`update_count` 自增**：值 = work order 的 `update_count_before + 1`。若 standalone 模式无 work order，从现有 `.meta.json` 读 `update_count` 再 +1。
 
-`name` / `title` / `description` / `original_url` / `original_repo` / `framework` / `translated_at` / `status` 保持不动。
+`name` / `title` / `description` / `original_repo` / `ssg` / `translated_at` / `status` 保持不动。
 
 ### Step 7: Rebuild site-index Project List
 
@@ -308,10 +295,9 @@ npm run dev     # http://127.0.0.1:5173/
 
 项目: {SLUG}
 位置: {TARGET_DIR}
-框架: {framework}
-原文: {original_url}
+SSG: {ssg}
 原文仓库: {original_repo}
-基于原文版本: {commit_short} ({commit_date})
+基于原文版本: {new_commit_short} ({new_commit_date})
 
 本地预览（单项目）:
   cd {TARGET_DIR} && {启动命令}
@@ -362,10 +348,10 @@ npm run dev     # http://127.0.0.1:5173/
 
 | 失败场景 | 应对 |
 |---------|------|
-| 源目录无效（无框架配置） | 报错退出，提示先用 `dg-docs-cn-translate` 翻译 |
+| 源目录无效（无 SSG 配置） | 报错退出，提示先用 `dg-docs-cn-translate` 翻译 |
 | 目标目录已存在 + 新建模式 | 询问：切换到更新模式 / 改名 / 取消 |
 | `.changed-files.json` 缺失 + 更新模式 | 警告 + 询问：全量复制（风险：覆盖未翻译文件）/ 取消 |
-| `.source-version.json` 缺失 | 警告，版本字段留空继续；建议重新生成 |
+| Work order 缺失（standalone 模式） | 警告「未检测到 work order，版本字段将为空」，继续执行 |
 | VitePress base 修改失败 | 跳过，警告用户手动确认 |
 | `npm install` 失败（网络问题） | 跳过，提示重试或换镜像源 |
 | 更新模式下原 commit 与新 commit 相同 | 警告「源版本未变，可能不需要更新」，仍允许继续（用户可能想强制重翻） |

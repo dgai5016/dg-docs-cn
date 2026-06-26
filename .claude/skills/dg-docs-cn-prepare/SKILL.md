@@ -1,7 +1,7 @@
 ---
 name: dg-docs-cn-prepare
 description: Decides what to translate for the dg-docs-cn pipeline. Detects new vs update mode, runs git diff against upstream, classifies file changes (Added/Modified/Deleted/Renamed), and produces a work order JSON consumed by dg-docs-cn-translate and dg-docs-cn-publish. No side effects on the dg-docs-cn tree. Bound to dg-docs-cn repo layout.
-version: 1.0.0
+version: 1.1.0
 metadata:
   openclaw:
     requires:
@@ -18,7 +18,7 @@ dg-docs-cn 流水线的第一阶段，被 `dg-docs-cn` 主入口调用。
 
 | 项目 | 说明 |
 |------|------|
-| 读 | `dg-docs-cn/{slug}/.project.json`（若存在）|
+| 读 | `dg-docs-cn/{slug}/.meta.json`（若存在）|
 | 写 | 仅 `/tmp/dg-prepare-{repo}/` 临时目录（含 work-order.json 备份）|
 | 不写 | dg-docs-cn 仓库树（任何文件都不动）|
 
@@ -36,11 +36,11 @@ Scripts in `scripts/` subdirectory. `{baseDir}` = this SKILL.md's directory path
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/detect-framework.sh` | Detect docs framework: prints `mkdocs` / `vitepress` / `mdbook` / `unknown` |
+| `scripts/detect-ssg.sh` | Detect docs static site generator: prints `mkdocs` / `vitepress` / `mdbook` / `unknown` |
 
 Usage:
 ```bash
-bash {baseDir}/scripts/detect-framework.sh <docs-path>
+bash {baseDir}/scripts/detect-ssg.sh <docs-path>
 ```
 
 ## Workflow
@@ -66,9 +66,9 @@ SLUG=$(echo "$GITHUB_URL" | sed -E 's|.*github\.com[/:][^/]+/([^/]+?)(\.git)?/?$
 
 ```bash
 REPO_ROOT=$(git rev-parse --show-toplevel)
-PROJECT_JSON="$REPO_ROOT/$SLUG/.project.json"
+META_JSON="$REPO_ROOT/$SLUG/.meta.json"
 
-if [ -f "$PROJECT_JSON" ]; then
+if [ -f "$META_JSON" ]; then
   MODE="update"
 else
   MODE="new"
@@ -89,27 +89,31 @@ mkdir -p "$TEMP_PROBE"
 NEW_COMMIT=$(git ls-remote "https://github.com/{owner}/{repo}.git" HEAD | awk '{print $1}')
 NEW_COMMIT_SHORT=${NEW_COMMIT:0:7}
 
-# 2. 浅克隆（仅框架配置文件）
+# 2. 浅克隆（拿框架配置文件 + commit 元信息）
 git clone --depth 1 "https://github.com/{owner}/{repo}.git" "$TEMP_PROBE"
+cd "$TEMP_PROBE"
 
-# 3. 检测框架
-FRAMEWORK=$(bash {baseDir}/scripts/detect-framework.sh "$TEMP_PROBE")
+# 3. 拿 upstream 实际 commit 日期（不用今天的日期，避免跟 upstream 错位）
+NEW_COMMIT_DATE=$(git log -1 --pretty=format:'%ad' --date=short)
 
-if [ "$FRAMEWORK" = "unknown" ]; then
-  echo "⚠️ 不支持的框架。本流水线仅支持 mkdocs / vitepress / mdbook。" >&2
+# 4. 检测 SSG（静态站点生成器）
+SSG=$(bash {baseDir}/scripts/detect-ssg.sh "$TEMP_PROBE")
+
+if [ "$SSG" = "unknown" ]; then
+  echo "⚠️ 不支持的 SSG。本流水线仅支持 mkdocs / vitepress / mdbook。" >&2
   exit 1
 fi
 
-# 4. 列出所有 md 文件作为 file_list
+# 5. 列出所有 md 文件作为 file_list
 file_list="all"   # 让 translate 自己 find，避免 prepare 重复列
 ```
 
-**slug 冲突检查**：若 `$REPO_ROOT/$SLUG/` 已存在但**无** `.project.json` → abort：
+**slug 冲突检查**：若 `$REPO_ROOT/$SLUG/` 已存在但**无** `.meta.json` → abort：
 
 ```
-⚠️ 目录 dg-docs-cn/$SLUG/ 已存在但无 .project.json。
-可能是手动建的非翻译项目，或者 .project.json 被误删。
-请先清理（删除目录或恢复 .project.json）后重跑。
+⚠️ 目录 dg-docs-cn/$SLUG/ 已存在但无 .meta.json。
+可能是手动建的非翻译项目，或者 .meta.json 被误删。
+请先清理（删除目录或恢复 .meta.json）后重跑。
 ```
 
 跳到 [Step 5](#step-5-输出-work-order)。
@@ -119,13 +123,12 @@ file_list="all"   # 让 translate 自己 find，避免 prepare 重复列
 #### 4.1 读现状
 
 ```bash
-OLD_COMMIT=$(jq -r .original_commit "$PROJECT_JSON")
-OLD_COMMIT_SHORT=$(jq -r .original_commit_short "$PROJECT_JSON")
-OLD_COMMIT_DATE=$(jq -r .original_commit_date "$PROJECT_JSON")
-ORIGINAL_BRANCH=$(jq -r .original_branch "$PROJECT_JSON")
-ORIGINAL_REPO=$(jq -r .original_repo "$PROJECT_JSON")
-FRAMEWORK=$(jq -r .framework "$PROJECT_JSON")
-UPDATE_COUNT=$(jq -r .update_count "$PROJECT_JSON")
+OLD_COMMIT=$(jq -r .original_commit "$META_JSON")
+OLD_COMMIT_SHORT=$(jq -r .original_commit_short "$META_JSON")
+OLD_COMMIT_DATE=$(jq -r .original_commit_date "$META_JSON")
+ORIGINAL_REPO=$(jq -r .original_repo "$META_JSON")
+SSG=$(jq -r .ssg "$META_JSON")
+UPDATE_COUNT=$(jq -r .update_count "$META_JSON")
 ```
 
 **异常**：`original_commit` 字段为空（旧项目未记录版本）→ 输出 work order 标 `mode: "legacy"`，让主入口询问用户「重翻译（覆盖）/ 手动补版本 / 取消」。
@@ -160,6 +163,9 @@ TEMP_DIR="/tmp/dg-prepare-$SLUG/"
 git clone "$ORIGINAL_REPO" "$TEMP_DIR"   # 完整 clone（需要历史做 diff）
 cd "$TEMP_DIR"
 
+# 拿 upstream 实际 commit 日期
+NEW_COMMIT_DATE=$(git log -1 --pretty=format:'%ad' --date=short "$NEW_COMMIT")
+
 DIFF_OUTPUT=$(git diff --name-status $OLD_COMMIT..$NEW_COMMIT -- docs/)
 
 ADDED=$(echo "$DIFF_OUTPUT" | grep "^A" | awk '{print $2}')
@@ -189,7 +195,7 @@ fi
 🔄 检测到原文更新
 
 项目: $SLUG
-原文版本: $OLD_COMMIT_SHORT ($OLD_COMMIT_DATE) → $NEW_COMMIT_SHORT (今天)
+原文版本: $OLD_COMMIT_SHORT ($OLD_COMMIT_DATE) → $NEW_COMMIT_SHORT ($NEW_COMMIT_DATE)
 累计已更新次数: $UPDATE_COUNT
 
 涉及 docs/ 下文件变更:
@@ -233,13 +239,13 @@ jq -n \
   --arg mode "$MODE" \
   --arg github_url "$GITHUB_URL" \
   --arg project_slug "$SLUG" \
-  --arg framework "$FRAMEWORK" \
+  --arg ssg "$SSG" \
   --arg old_commit "$OLD_COMMIT" \
   --arg old_commit_short "$OLD_COMMIT_SHORT" \
   --arg old_commit_date "$OLD_COMMIT_DATE" \
   --arg new_commit "$NEW_COMMIT" \
   --arg new_commit_short "$NEW_COMMIT_SHORT" \
-  --arg new_commit_date "$(date +%Y-%m-%d)" \
+  --arg new_commit_date "$NEW_COMMIT_DATE" \
   --argjson file_list "$(echo "$file_list" | jq -R . | jq -s .)" \
   --argjson deleted_files "$(echo "$DELETED" | jq -R . | jq -s .)" \
   --argjson renamed_files "$(echo "$RENAMED" | jq -R . | jq -s .)" \
@@ -251,7 +257,7 @@ jq -n \
     mode: $mode,
     github_url: $github_url,
     project_slug: $project_slug,
-    framework: $framework,
+    ssg: $ssg,
     old_commit: $old_commit,
     old_commit_short: $old_commit_short,
     old_commit_date: $old_commit_date,
@@ -280,7 +286,7 @@ cat "$WORK_ORDER_FILE"
 
 模式: $MODE
 项目目录: dg-docs-cn/$SLUG/
-框架: $FRAMEWORK
+SSG: $SSG
 本次翻译范围: $(echo "$file_list" | grep -c . || echo "全部") 个文件
 
 Work order 已写入: $WORK_ORDER_FILE
@@ -293,10 +299,10 @@ Work order 已写入: $WORK_ORDER_FILE
 | `mode` | string | `new` / `update` / `noop` / `legacy` / `bad_object` / `error` |
 | `github_url` | string | 原文仓库 URL |
 | `project_slug` | string | **严格 = repo 名**（不接受用户覆盖） |
-| `framework` | string | `mkdocs` / `vitepress` / `mdbook` |
+| `ssg` | string | `mkdocs` / `vitepress` / `mdbook` |
 | `old_commit` / `new_commit` | string | 完整 SHA（update 模式才有 old） |
 | `old_commit_short` / `new_commit_short` | string | 7 位短 SHA |
-| `old_commit_date` / `new_commit_date` | string | YYYY-MM-DD |
+| `old_commit_date` / `new_commit_date` | string | YYYY-MM-DD（**真实 commit 日期**，非"今天"） |
 | `file_list` | string[] \| `"all"` | 要翻译的文件相对路径；new 模式为 `"all"` |
 | `deleted_files` | string[] | 原文已删除（中文版保留） |
 | `renamed_files` | string[] | 重命名（手动处理） |
@@ -316,7 +322,7 @@ Work order 已写入: $WORK_ORDER_FILE
 | >50% 文件变更 | `large_churn: true`（仍输出 file_list） | 警告 + 询问：切新建模式 / 继续增量 |
 | 文件重命名 | `renamed_files` 列出，不入 file_list | 警告「N 个文件重命名，自动翻译会漏，建议手动处理」 |
 | slug 冲突（new 模式但目录已存在） | abort | 退出，让用户清理或换 repo |
-| 不支持的框架 | exit 1 | 报错退出，提示加 framework 适配器 |
+| 不支持的 SSG | exit 1 | 报错退出，提示加 SSG 适配器 |
 
 ## 不做的事
 
@@ -325,4 +331,4 @@ Work order 已写入: $WORK_ORDER_FILE
 - ❌ **不复制文件**——交给 `dg-docs-cn-publish`
 - ❌ **不接受用户自定义 slug**——`project_slug` 严格 = URL 中的 repo 名
 - ❌ **不自动删除原文已删除的文件**——保留中文版，由用户决定
-- ❌ **不写 `.source-version.json`**——那是 translate 的产物
+- ❌ **不写 `.source-version.json`**——版本信息通过 work order 传给 publish，不再需要这个中间文件

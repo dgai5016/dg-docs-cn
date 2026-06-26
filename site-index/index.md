@@ -34,7 +34,7 @@ import projectsData from './.vitepress/projects.json'
     class="project-card"
   >
     <div class="project-card-header">
-      <span :class="['framework-badge', `framework-${p.framework}`]">{{ p.framework }}</span>
+      <span :class="['ssg-badge', `ssg-${p.ssg}`]">{{ p.ssg }}</span>
       <span class="project-status">{{ p.status === 'complete' ? '✅' : '🚧' }}</span>
     </div>
     <h3>{{ p.title }}</h3>
@@ -105,7 +105,7 @@ import projectsData from './.vitepress/projects.json'
   margin-bottom: 0.5rem;
 }
 
-.framework-badge {
+.ssg-badge {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 4px;
@@ -117,14 +117,19 @@ import projectsData from './.vitepress/projects.json'
   letter-spacing: 0.5px;
 }
 
-.framework-badge.framework-vitepress {
+.ssg-badge.ssg-vitepress {
   background: rgba(16, 185, 129, 0.1);
   color: #10b981;
 }
 
-.framework-badge.framework-mkdocs {
+.ssg-badge.ssg-mkdocs {
   background: rgba(99, 102, 241, 0.1);
   color: #6366f1;
+}
+
+.ssg-badge.ssg-mdbook {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
 }
 
 .project-card h3 {

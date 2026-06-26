@@ -22,21 +22,21 @@ version: 2.0.0
             │     翻译 markdown + nav（全量或按 work order 的 file_list）
             │
             └─► dg-docs-cn-publish
-                  搬运 + 改 base URL + 生成/更新 .project.json + 重建索引
+                  搬运 + 改 base URL + 生成/更新 .meta.json + 重建索引
 ```
 
 | 阶段 | Sub-skill | 唯一不可替代的能力 |
 |------|-----------|------------------|
 | 1. 决策 | `dg-docs-cn-prepare` | 跨 commit diff（`git ls-remote` + `git diff OLD..NEW`）|
-| 2. 翻译 | `dg-docs-cn-translate` | 翻译 markdown + nav，输出 `.source-version.json` |
-| 3. 落地 | `dg-docs-cn-publish` | 改 VitePress base、生成 `.project.json`、重建索引 |
+| 2. 翻译 | `dg-docs-cn-translate` | 翻译 markdown + nav，输出 `.changed-files.json` |
+| 3. 落地 | `dg-docs-cn-publish` | 改 VitePress base、生成 `.meta.json`、重建索引 |
 
 **自动判别两种模式**（由 prepare 决定，本 skill 只读结果）：
 
 | 模式 | 触发条件 | 工作流 |
 |------|---------|--------|
-| 新建模式 | `dg-docs-cn/{slug}/.project.json` 不存在 | 完整翻译 + 首次搬运 |
-| 更新模式 | `dg-docs-cn/{slug}/.project.json` 已存在 | 检测原文 commit 变化 → diff 文件 → 只翻译变更部分 → 合并 |
+| 新建模式 | `dg-docs-cn/{slug}/.meta.json` 不存在 | 完整翻译 + 首次搬运 |
+| 更新模式 | `dg-docs-cn/{slug}/.meta.json` 已存在 | 检测原文 commit 变化 → diff 文件 → 只翻译变更部分 → 合并 |
 
 ## User Input Tools
 
@@ -145,15 +145,15 @@ WORK_ORDER_FILE="/tmp/dg-prepare-$SLUG/work-order.json"
 
 【翻译】
   源仓库: {owner}/{repo}
-  框架: {framework}
+  SSG: {ssg}
   翻译文件数: {N}
   失败文件: {失败清单或"无"}
-  基于原文版本: {commit_short} ({commit_date})
+  基于原文版本: {new_commit_short} ({new_commit_date})
 
 【落地】
   目标目录: dg-docs-cn/$SLUG/
   base URL 已配置（若 VitePress）
-  .project.json 已创建
+  .meta.json 已创建
   索引页项目列表已重建
 
 【预览】
@@ -180,7 +180,7 @@ WORK_ORDER_FILE="/tmp/dg-prepare-$SLUG/work-order.json"
 
 【落地】
   变更文件已合并到 dg-docs-cn/$SLUG/
-  .project.json 已更新版本字段（update_count: {N} → {N+1}）
+  .meta.json 已更新版本字段（update_count: {N} → {N+1}）
   索引页已重建
 
 【预览】
@@ -200,7 +200,7 @@ WORK_ORDER_FILE="/tmp/dg-prepare-$SLUG/work-order.json"
 当前版本: {old_commit_short} ({old_commit_date})
 upstream HEAD: 相同
 
-如需强制重翻，删除 dg-docs-cn/$SLUG/.project.json 后重跑（会进入新建模式）。
+如需强制重翻，删除 dg-docs-cn/$SLUG/.meta.json 后重跑（会进入新建模式）。
 ```
 
 ## Step 5: 临时目录清理
@@ -230,7 +230,7 @@ prepare / translate / publish 的异常上抛到本 skill 决策。
 | prepare 报 `mode: "bad_object"` | 警告「原 commit 已不在仓库（被 rebase）」。询问：全量重翻译 / 取消 |
 | prepare 报 `large_churn: true` | 警告「检测到大范围目录变化（>50% 文件）」。询问：切新建模式 / 继续增量 |
 | prepare 检测到重命名（R） | 警告「N 个文件重命名，自动翻译会漏，建议手动处理」后继续 |
-| translate 报框架不支持 | 退出（理论上首次翻译时已检测过，更新不会变）|
+| translate 报 SSG 不支持 | 退出（理论上首次翻译时已检测过，更新不会变）|
 | translate 部分文件失败 | 不阻塞 publish，publish 后单独重试失败文件 |
 | **translate 成功但 publish 失败** | **保留 translate 输出目录**（`/tmp/dg-translate-{repo}/`），询问「翻译产物还在 `{path}`，要重试 publish 吗？」。同意 → 用相同参数重调 publish；拒绝 → 退出，不删翻译产物（用户可手动抢救）|
 | `.changed-files.json` 缺失 + 更新模式 | publish 会询问用户：全量复制（风险：覆盖未翻译文件）/ 取消 |
