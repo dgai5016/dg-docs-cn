@@ -4,14 +4,6 @@ layout: home
 hero:
   name: 中文技术文档合集
   text: 英文技术文档中文翻译
-  tagline: 保留源站 UI，本站直达译站
-  actions:
-    - theme: brand
-      text: 浏览项目
-      link: "#projects"
-    - theme: alt
-      text: GitHub
-      link: https://github.com/dgai5016/dg-docs-cn
 ---
 
 <script setup>

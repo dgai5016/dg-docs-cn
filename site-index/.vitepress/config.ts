@@ -7,8 +7,8 @@ const projectSearchBoxPath = fileURLToPath(
 
 export default defineConfig({
   lang: 'zh-CN',
-  title: '中文技术文档合集',
-  description: '英文技术文档中文翻译合集',
+  title: '英文技术文档中文翻译合集',
+  description: '保留源站 UI，本站直达译站',
   base: '/dg-docs-cn/',
   cleanUrls: true,
   lastUpdated: true,
@@ -33,15 +33,15 @@ export default defineConfig({
   },
 
   themeConfig: {
-    siteTitle: '中文技术文档合集',
+    siteTitle: '英文技术文档中文翻译合集',
 
-    nav: [
-      { text: '首页', link: '/' },
-      {
-        text: 'GitHub',
-        link: 'https://github.com/dgai5016/dg-docs-cn'
-      }
-    ],
+    // nav: [
+    //   { text: '首页', link: '/' },
+    //   {
+    //     text: 'GitHub',
+    //     link: 'https://github.com/dgai5016/dg-docs-cn'
+    //   }
+    // ],
 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/dgai5016/dg-docs-cn' }
