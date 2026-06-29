@@ -1,0 +1,13 @@
+{
+  "name": "obsidian-linter",
+  "title": "Obsidian Linter 中文文档",
+  "description": "Obsidian Linter 插件官方文档中文翻译——可配置的笔记格式化规则集，覆盖 YAML frontmatter、标题、脚注、内容、间距等",
+  "ssg": "mkdocs",
+  "status": "complete",
+  "original_repo": "https://github.com/platers/obsidian-linter",
+  "original_commit": "add8dab72482edb94b449113d63816f0eb7c161f",
+  "original_commit_short": "add8dab",
+  "original_commit_date": "2026-06-17",
+  "translated_at": "2026-06-29",
+  "update_count": 0
+}

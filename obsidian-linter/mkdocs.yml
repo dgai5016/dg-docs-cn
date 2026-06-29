@@ -1,0 +1,46 @@
+site_name: Linter
+repo_url: https://github.com/platers/obsidian-linter
+edit_uri: edit/master/docs/docs/
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed
+theme:
+  name: material
+  palette:
+    primary: deep purple
+  logo: assets/linter-icon.png
+  favicon: assets/linter-icon.png
+nav:
+  - 概览: 'index.md'
+  - 使用方法:
+    - 运行规则: 'usage/running-rules.md'
+    - 禁用规则: 'usage/disabling-rules.md'
+  - 设置与规则:
+    - 通用设置: settings/general-settings.md
+    - YAML 规则: 'settings/yaml-rules.md'
+    - 标题规则: 'settings/heading-rules.md'
+    - 脚注规则: 'settings/footnote-rules.md'
+    - 内容规则: 'settings/content-rules.md'
+    - 间距规则: 'settings/spacing-rules.md'
+    - 粘贴规则: 'settings/paste-rules.md'
+    - 自定义规则: 'settings/custom-rules.md'
+    - 调试设置: 'settings/debug-settings.md'
+  - 参与贡献:
+    - 插件配置: 'contributing/getting-setup.md'
+    - 添加规则: 'contributing/adding-a-rule.md'
+    - 修复 Bug: 'contributing/bug-fix.md'
+    - 重构代码: 'contributing/refactoring.md'
+    - 测试: 'contributing/testing.md'
+    - 翻译 Linter: 'contributing/translation.md'
+    - 编写 Linter 文档: 'contributing/documentation.md'
+    - 提交 Pull Request: 'contributing/open-a-pr.md'
+    - 创建发布: 'contributing/releasing.md'
+  - 致谢: 'credits.md'
+plugins:
+  - search
